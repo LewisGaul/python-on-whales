@@ -78,7 +78,7 @@ class ContainerRestartPolicy(DockerCamelModel):
 
 class PortBinding(DockerCamelModel):
     host_ip: Optional[str] = None
-    host_port: Optional[int] = None
+    host_port: Optional[str] = None
 
 
 class ContainerMountBindOption(DockerCamelModel):
