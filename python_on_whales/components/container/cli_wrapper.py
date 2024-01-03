@@ -1756,8 +1756,7 @@ class ContainerCLI(DockerCLICaller):
         # Returns
             A `List[python_on_whales.ContainerStats]`.
         """
-        containers = [] if containers is None else to_list(containers)
-        if len(containers) == 0 and not all:
+        if containers == []:
             return []
 
         full_cmd = self.docker_cmd + [
@@ -1769,7 +1768,8 @@ class ContainerCLI(DockerCLICaller):
             "--no-trunc",
         ]
         full_cmd.add_flag("--all", all)
-        full_cmd.extend(str(c) for c in containers)
+        if containers:
+            full_cmd.extend(str(c) for c in to_list(containers))
 
         stats_output = run(full_cmd)
         return [ContainerStats(json.loads(x)) for x in stats_output.splitlines()]
