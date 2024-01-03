@@ -19,6 +19,9 @@ from typing import (
 
 import pydantic
 
+import python_on_whales.components.image.cli_wrapper
+import python_on_whales.components.network.cli_wrapper
+import python_on_whales.components.volume.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
@@ -33,9 +36,6 @@ from python_on_whales.components.container.models import (
     Mount,
     NetworkSettings,
 )
-from python_on_whales.components.image.cli_wrapper import Image, ImageCLI, ValidImage
-from python_on_whales.components.network.cli_wrapper import ValidNetwork
-from python_on_whales.components.volume.cli_wrapper import VolumeDefinition
 from python_on_whales.exceptions import NoSuchContainer
 from python_on_whales.utils import (
     ValidPath,
@@ -237,7 +237,7 @@ class Container(ReloadableObjectFromJson):
         author: Optional[str] = None,
         message: Optional[str] = None,
         pause: bool = True,
-    ) -> Image:
+    ) -> python_on_whales.components.image.cli_wrapper.Image:
         """Create a new image from the container's changes.
 
         Alias: `docker.commit(...)`
@@ -450,7 +450,7 @@ class ContainerCLI(DockerCLICaller):
         author: Optional[str] = None,
         message: Optional[str] = None,
         pause: bool = True,
-    ) -> Image:
+    ) -> python_on_whales.components.image.cli_wrapper.Image:
         """Create a new image from a container's changes
 
         Parameters:
@@ -472,7 +472,9 @@ class ContainerCLI(DockerCLICaller):
         if tag is not None:
             full_cmd.append(tag)
 
-        return Image(self.client_config, run(full_cmd), is_immutable_id=True)
+        return python_on_whales.components.image.cli_wrapper.Image(
+            self.client_config, run(full_cmd), is_immutable_id=True
+        )
 
     def copy(
         self,
@@ -523,7 +525,7 @@ class ContainerCLI(DockerCLICaller):
 
     def create(
         self,
-        image: ValidImage,
+        image: python_on_whales.components.image.cli_wrapper.ValidImage,
         command: List[str] = [],
         *,
         add_hosts: List[Tuple[str, str]] = [],
@@ -586,7 +588,9 @@ class ContainerCLI(DockerCLICaller):
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
-        networks: List[ValidNetwork] = [],
+        networks: List[
+            python_on_whales.components.network.cli_wrapper.ValidNetwork
+        ] = [],
         network_aliases: List[str] = [],
         oom_kill: bool = True,
         oom_score_adj: Optional[int] = None,
@@ -614,7 +618,9 @@ class ContainerCLI(DockerCLICaller):
         user: Optional[str] = None,
         userns: Optional[str] = None,
         uts: Optional[str] = None,
-        volumes: Optional[List[VolumeDefinition]] = [],
+        volumes: Optional[
+            List[python_on_whales.components.volume.cli_wrapper.VolumeDefinition]
+        ] = [],
         volume_driver: Optional[str] = None,
         volumes_from: List[ValidContainer] = [],
         workdir: Optional[ValidPath] = None,
@@ -635,7 +641,9 @@ class ContainerCLI(DockerCLICaller):
         The arguments are the same as [`docker.run`](#run).
         """
 
-        image_cli = ImageCLI(self.client_config)
+        image_cli = python_on_whales.components.image.cli_wrapper.ImageCLI(
+            self.client_config
+        )
         if pull == "missing":
             image_cli._pull_if_necessary(image)
         elif pull == "always":
@@ -1230,7 +1238,7 @@ class ContainerCLI(DockerCLICaller):
 
     def run(
         self,
-        image: ValidImage,
+        image: python_on_whales.components.image.cli_wrapper.ValidImage,
         command: List[str] = [],
         *,
         add_hosts: List[Tuple[str, str]] = [],
@@ -1294,7 +1302,9 @@ class ContainerCLI(DockerCLICaller):
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
-        networks: List[ValidNetwork] = [],
+        networks: List[
+            python_on_whales.components.network.cli_wrapper.ValidNetwork
+        ] = [],
         network_aliases: List[str] = [],
         oom_kill: bool = True,
         oom_score_adj: Optional[int] = None,
@@ -1324,7 +1334,9 @@ class ContainerCLI(DockerCLICaller):
         user: Optional[str] = None,
         userns: Optional[str] = None,
         uts: Optional[str] = None,
-        volumes: Optional[List[VolumeDefinition]] = [],
+        volumes: Optional[
+            List[python_on_whales.components.volume.cli_wrapper.VolumeDefinition]
+        ] = [],
         volume_driver: Optional[str] = None,
         volumes_from: List[ValidContainer] = [],
         workdir: Optional[ValidPath] = None,
@@ -1504,7 +1516,9 @@ class ContainerCLI(DockerCLICaller):
                 )
             raise TypeError(error_message)
 
-        image_cli = ImageCLI(self.client_config)
+        image_cli = python_on_whales.components.image.cli_wrapper.ImageCLI(
+            self.client_config
+        )
         if pull == "missing":
             image_cli._pull_if_necessary(image)
         elif pull == "always":

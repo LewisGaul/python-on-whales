@@ -20,9 +20,7 @@ from python_on_whales.client_config import (
     DockerCLICaller,
     ReloadableObjectFromJson,
 )
-from python_on_whales.components.container.cli_wrapper import (
-    ValidContainer,
-)
+from python_on_whales.components.container.cli_wrapper import ValidContainer
 from python_on_whales.components.image.cli_wrapper import ValidImage
 from python_on_whales.components.network.cli_wrapper import ValidNetwork
 from python_on_whales.components.pod.models import (
@@ -44,7 +42,6 @@ from python_on_whales.utils import (
     stream_stdout_and_stderr,
     to_list,
 )
-
 
 PodListFilters = TypedDict(
     "PodListFilters",
