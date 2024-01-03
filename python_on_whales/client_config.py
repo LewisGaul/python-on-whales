@@ -245,7 +245,7 @@ class ReloadableObjectFromJson(ReloadableObject):
         except pydantic.ValidationError as err:
             fd, json_response_file = tempfile.mkstemp(suffix=".json", text=True)
             with open(json_response_file, "w") as f:
-                json.dump(f, json_object, indent=2)
+                json.dump(json_object, f, indent=2)
 
             raise ParsingError(
                 f"There was an error parsing the json response from the Docker daemon. \n"
