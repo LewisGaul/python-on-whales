@@ -19,9 +19,6 @@ from typing import (
 
 import pydantic
 
-import python_on_whales.components.image.cli_wrapper
-import python_on_whales.components.network.cli_wrapper
-import python_on_whales.components.volume.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
@@ -36,17 +33,24 @@ from python_on_whales.components.container.models import (
     Mount,
     NetworkSettings,
 )
+from python_on_whales.components.image.cli_wrapper import Image, ImageCLI, ValidImage
+from python_on_whales.components.network.cli_wrapper import ValidNetwork
+from python_on_whales.components.volume.cli_wrapper import VolumeDefinition
 from python_on_whales.exceptions import NoSuchContainer
 from python_on_whales.utils import (
     ValidPath,
+    ValidPortMapping,
     custom_parse_object_as,
     format_dict_for_cli,
+    format_port_arg,
     format_signal_arg,
     format_time_arg,
+    join_if_not_none,
     removeprefix,
     run,
     stream_stdout_and_stderr,
     to_list,
+    to_seconds,
 )
 
 DockerContainerListFilters = TypedDict(
@@ -233,7 +237,7 @@ class Container(ReloadableObjectFromJson):
         author: Optional[str] = None,
         message: Optional[str] = None,
         pause: bool = True,
-    ) -> python_on_whales.components.image.cli_wrapper.Image:
+    ) -> Image:
         """Create a new image from the container's changes.
 
         Alias: `docker.commit(...)`
@@ -290,6 +294,15 @@ class Container(ReloadableObjectFromJson):
             workdir,
             stream,
         )
+
+    def exists(self) -> bool:
+        """Returns `True` if the docker container exists and `False` if it doesn't exists.
+
+        If it doesn't exists, it most likely mean that it was removed.
+
+         See the `docker.container.exists` command for information about the arguments.
+        """
+        return ContainerCLI(self.client_config).exists(self.id)
 
     def export(self, output: ValidPath) -> None:
         """Export this container filesystem.
@@ -390,22 +403,9 @@ class Container(ReloadableObjectFromJson):
         """
         return ContainerCLI(self.client_config).stop(self, time)
 
-    def exists(self) -> bool:
-        """Returns `True` if the docker container exists and `False` if it doesn't exists.
-
-        If it doesn't exists, it most likely mean that it was removed.
-
-         See the `docker.container.exists` command for information about the arguments.
-        """
-        return ContainerCLI(self.client_config).exists(self.id)
-
 
 ContainerPath = Tuple[Union[Container, str], ValidPath]
 ValidContainer = Union[Container, str]
-ValidPortMapping = Union[
-    Tuple[Union[str, int], Union[str, int]],
-    Tuple[Union[str, int], Union[str, int], str],
-]
 
 
 class ContainerCLI(DockerCLICaller):
@@ -450,7 +450,7 @@ class ContainerCLI(DockerCLICaller):
         author: Optional[str] = None,
         message: Optional[str] = None,
         pause: bool = True,
-    ) -> python_on_whales.components.image.cli_wrapper.Image:
+    ) -> Image:
         """Create a new image from a container's changes
 
         Parameters:
@@ -475,9 +475,7 @@ class ContainerCLI(DockerCLICaller):
         if tag is not None:
             full_cmd.append(tag)
 
-        return python_on_whales.components.image.cli_wrapper.Image(
-            self.client_config, run(full_cmd), is_immutable_id=True
-        )
+        return Image(self.client_config, run(full_cmd), is_immutable_id=True)
 
     def copy(
         self,
@@ -528,7 +526,7 @@ class ContainerCLI(DockerCLICaller):
 
     def create(
         self,
-        image: str,
+        image: ValidImage,
         command: List[str] = [],
         *,
         add_hosts: List[Tuple[str, str]] = [],
@@ -591,9 +589,7 @@ class ContainerCLI(DockerCLICaller):
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
-        networks: List[
-            python_on_whales.components.network.cli_wrapper.ValidNetwork
-        ] = [],
+        networks: List[ValidNetwork] = [],
         network_aliases: List[str] = [],
         oom_kill: bool = True,
         oom_score_adj: Optional[int] = None,
@@ -621,9 +617,7 @@ class ContainerCLI(DockerCLICaller):
         user: Optional[str] = None,
         userns: Optional[str] = None,
         uts: Optional[str] = None,
-        volumes: Optional[
-            List[python_on_whales.components.volume.cli_wrapper.VolumeDefinition]
-        ] = [],
+        volumes: Optional[List[VolumeDefinition]] = [],
         volume_driver: Optional[str] = None,
         volumes_from: List[ValidContainer] = [],
         workdir: Optional[ValidPath] = None,
@@ -644,9 +638,7 @@ class ContainerCLI(DockerCLICaller):
         The arguments are the same as [`docker.run`](#run).
         """
 
-        image_cli = python_on_whales.components.image.cli_wrapper.ImageCLI(
-            self.client_config
-        )
+        image_cli = ImageCLI(self.client_config)
         if pull == "missing":
             image_cli._pull_if_necessary(image)
         elif pull == "always":
@@ -756,7 +748,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_simple_arg("--platform", platform)
         full_cmd.add_flag("--privileged", privileged)
 
-        self._add_publish_to_command(full_cmd, publish)
+        full_cmd.add_args_list("-p", [format_port_arg(p) for p in publish])
         full_cmd.add_flag("--publish-all", publish_all)
 
         if pull == "never":
@@ -797,22 +789,6 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.append(image)
         full_cmd += command
         return Container(self.client_config, run(full_cmd), is_immutable_id=True)
-
-    def _add_publish_to_command(self, full_cmd, publish):
-        for port_mapping in publish:
-            if len(port_mapping) == 1:
-                full_cmd += ["-p", port_mapping[0]]
-            elif len(port_mapping) == 2:
-                full_cmd += ["-p", f"{port_mapping[0]}:{port_mapping[1]}"]
-            elif len(port_mapping) == 3:
-                full_cmd += [
-                    "-p",
-                    f"{port_mapping[0]}:{port_mapping[1]}/{port_mapping[2]}",
-                ]
-            else:
-                raise ValueError(
-                    "The size of the tuples in the publish list must be 1, 2, or 3"
-                )
 
     def diff(self, container: ValidContainer) -> Dict[str, str]:
         """List all the files modified, added or deleted since the container started.
@@ -944,6 +920,22 @@ class ContainerCLI(DockerCLICaller):
             else:
                 return result
 
+    def exists(self, x: ValidContainer) -> bool:
+        """Returns `True` if the container exists. `False` otherwise.
+
+         It's just calling `docker.container.inspect(...)` and verifies that it doesn't throw
+         a `python_on_whales.exceptions.NoSuchContainer`.
+
+        # Returns
+            A `bool`
+        """
+        try:
+            self.inspect(x)
+        except NoSuchContainer:
+            return False
+        else:
+            return True
+
     def export(self, container: ValidContainer, output: ValidPath) -> None:
         """Export a container's filesystem as a tar archive
 
@@ -969,14 +961,16 @@ class ContainerCLI(DockerCLICaller):
             run(full_cmd)
 
     @overload
-    def inspect(self, x: str, /) -> Container:
+    def inspect(self, x: ValidContainer, /) -> Container:
         ...
 
     @overload
-    def inspect(self, x: List[str], /) -> List[Container]:
+    def inspect(self, x: List[ValidContainer], /) -> List[Container]:
         ...
 
-    def inspect(self, x: Union[str, List[str]], /) -> Union[Container, List[Container]]:
+    def inspect(
+        self, x: Union[ValidContainer, List[ValidContainer]], /
+    ) -> Union[Container, List[Container]]:
         """Returns a container object from a name or ID.
 
         Parameters:
@@ -1057,7 +1051,7 @@ class ContainerCLI(DockerCLICaller):
                 Without `stream`, only a `str` will be returned, possibly much later in the
                 future. With `stream`, you'll be able to read the logs in real time.
             stream: Similar to the `stream` argument of `docker.run`.
-                This function will then returns and iterator that will yield a
+                This function will then return an iterator that will yield a
                 tuple `(source, content)` with `source` being `"stderr"` or
                 `"stdout"`. `content` is the content of the line as bytes.
                 Take a look at [the user guide](https://gabrieldemarmiesse.github.io/python-on-whales/user_guide/docker_run/#stream-the-output)
@@ -1068,13 +1062,13 @@ class ContainerCLI(DockerCLICaller):
             if `stream=True`.
 
         # Raises
-            `python_on_whales.exceptions.NoSuchContainer` if the container does not exists.
+            `python_on_whales.exceptions.NoSuchContainer` if the container does not exist.
 
         If you are a bit confused about `follow` and `stream`, here are some use cases.
 
         * If you want to have the logs up to this point as a `str`, don't use those args.
         * If you want to stream the output in real time, use `follow=True, stream=True`
-        * If you want the logs up to this point but you don't want to fit all the logs
+        * If you want the logs up to this point, but you don't want to fit all the logs
         in memory because they are too big, use `stream=True`.
         """
 
@@ -1241,7 +1235,7 @@ class ContainerCLI(DockerCLICaller):
 
     def run(
         self,
-        image: python_on_whales.components.image.cli_wrapper.ValidImage,
+        image: ValidImage,
         command: List[str] = [],
         *,
         add_hosts: List[Tuple[str, str]] = [],
@@ -1305,9 +1299,7 @@ class ContainerCLI(DockerCLICaller):
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
-        networks: List[
-            python_on_whales.components.network.cli_wrapper.ValidNetwork
-        ] = [],
+        networks: List[ValidNetwork] = [],
         network_aliases: List[str] = [],
         oom_kill: bool = True,
         oom_score_adj: Optional[int] = None,
@@ -1337,9 +1329,7 @@ class ContainerCLI(DockerCLICaller):
         user: Optional[str] = None,
         userns: Optional[str] = None,
         uts: Optional[str] = None,
-        volumes: Optional[
-            List[python_on_whales.components.volume.cli_wrapper.VolumeDefinition]
-        ] = [],
+        volumes: Optional[List[VolumeDefinition]] = [],
         volume_driver: Optional[str] = None,
         volumes_from: List[ValidContainer] = [],
         workdir: Optional[ValidPath] = None,
@@ -1519,9 +1509,7 @@ class ContainerCLI(DockerCLICaller):
                 )
             raise TypeError(error_message)
 
-        image_cli = python_on_whales.components.image.cli_wrapper.ImageCLI(
-            self.client_config
-        )
+        image_cli = ImageCLI(self.client_config)
         if pull == "missing":
             image_cli._pull_if_necessary(image)
         elif pull == "always":
@@ -1634,7 +1622,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_simple_arg("--platform", platform)
         full_cmd.add_flag("--privileged", privileged)
 
-        self._add_publish_to_command(full_cmd, publish)
+        full_cmd.add_args_list("-p", [format_port_arg(p) for p in publish])
         full_cmd.add_flag("--publish-all", publish_all)
 
         if pull == "never":
@@ -1972,22 +1960,6 @@ class ContainerCLI(DockerCLICaller):
             full_cmd.append(x)
             return int(run(full_cmd))
 
-    def exists(self, x: str) -> bool:
-        """Returns `True` if the container exists. `False` otherwise.
-
-         It's just calling `docker.container.inspect(...)` and verifies that it doesn't throw
-         a `python_on_whales.exceptions.NoSuchContainer`.
-
-        # Returns
-            A `bool`
-        """
-        try:
-            self.inspect(x)
-        except NoSuchContainer:
-            return False
-        else:
-            return True
-
 
 class ContainerStats:
     def __init__(self, json_dict: Dict[str, Any]):
@@ -2021,18 +1993,3 @@ class ContainerStats:
     def __repr__(self):
         attr = ", ".join(f"{key}={value}" for key, value in self.__dict__.items())
         return f"<{self.__class__} object, attributes are {attr}>"
-
-
-def join_if_not_none(sequence: Optional[list]) -> Optional[str]:
-    if sequence is None:
-        return None
-    sequence = [str(x) for x in sequence]
-    return ",".join(sequence)
-
-
-def to_seconds(duration: Union[None, int, timedelta]) -> Optional[str]:
-    if duration is None:
-        return None
-    if isinstance(duration, timedelta):
-        duration = int(duration.total_seconds())
-    return f"{duration}s"
