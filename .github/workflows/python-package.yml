@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - pod-cli
   pull_request: {}
 
 jobs:
