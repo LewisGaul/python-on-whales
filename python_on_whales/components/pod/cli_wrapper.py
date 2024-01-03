@@ -74,9 +74,9 @@ class Pod(ReloadableObjectFromJson):
         self.remove(force=True)
 
     def _fetch_inspect_result_json(self, reference):
-        return run(self.docker_cmd + ["pod", "inspect", reference])
+        return [run(self.docker_cmd + ["pod", "inspect", reference])]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]) -> PodInspectResult:
+    def _parse_json_object(self, json_object: Mapping[str, Any]) -> PodInspectResult:
         return PodInspectResult(**json_object)
 
     def _get_inspect_result(self) -> PodInspectResult:
@@ -549,6 +549,8 @@ class PodCLI(DockerCLICaller):
         """Remove pods that are not running."""
         full_cmd = self.docker_cmd + ["pod", "prune", "--force"]
         run(full_cmd)
+
+    ps = list
 
     def remove(
         self,

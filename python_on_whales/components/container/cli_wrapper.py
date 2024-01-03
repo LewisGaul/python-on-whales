@@ -462,8 +462,8 @@ class ContainerCLI(DockerCLICaller):
         """
         full_cmd = self.docker_cmd + ["container", "commit"]
 
-        full_cmd.add_simple_arg(["--author", author])
-        full_cmd.add_simple_arg(["--message", message])
+        full_cmd.add_simple_arg("--author", author)
+        full_cmd.add_simple_arg("--message", message)
 
         # TODO: fixme
         # full_cmd += ["--pause", str(pause).lower()]
@@ -1157,6 +1157,8 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_args_list("--filter", format_dict_for_cli(filters))
         run(full_cmd)
 
+    ps = list
+
     def rename(self, container: ValidContainer, new_name: str) -> None:
         """Changes the name of a container.
 
@@ -1766,6 +1768,7 @@ class ContainerCLI(DockerCLICaller):
             "--no-trunc",
         ]
         full_cmd.add_flag("--all", all)
+        full_cmd.extend(str(c) for c in containers)
 
         stats_output = run(full_cmd)
         return [ContainerStats(json.loads(x)) for x in stats_output.splitlines()]
