@@ -1116,7 +1116,7 @@ class ContainerCLI(DockerCLICaller):
             for x in run(full_cmd).splitlines()
         ]
 
-    def pause(self, containers: Union[ValidContainer, List[ValidContainer]]):
+    def pause(self, containers: Union[ValidContainer, List[ValidContainer]]) -> None:
         """Pauses one or more containers
 
         Alias: `docker.pause(...)`
@@ -1172,7 +1172,7 @@ class ContainerCLI(DockerCLICaller):
         self,
         containers: Union[ValidContainer, List[ValidContainer]],
         time: Optional[Union[int, timedelta]] = None,
-    ):
+    ) -> None:
         """Restarts one or more container.
 
         Alias: `docker.restart(...)`
@@ -1808,7 +1808,7 @@ class ContainerCLI(DockerCLICaller):
         Not yet implemented"""
         raise NotImplementedError
 
-    def unpause(self, x: Union[ValidContainer, List[ValidContainer]], /):
+    def unpause(self, x: Union[ValidContainer, List[ValidContainer]], /) -> None:
         """Unpause all processes within one or more containers
 
         Alias: `docker.unpause(...)`
@@ -1847,7 +1847,7 @@ class ContainerCLI(DockerCLICaller):
         memory_swap: Union[int, str, None] = None,
         pids_limit: Optional[int] = None,
         restart: Optional[str] = None,
-    ):
+    ) -> None:
         """Update configuration of one or more containers
 
         Alias: `docker.update(...)`

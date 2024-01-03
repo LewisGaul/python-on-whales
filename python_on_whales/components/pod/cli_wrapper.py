@@ -1,9 +1,19 @@
 from __future__ import annotations
 
-import warnings
+import json
 from datetime import datetime, timedelta
-from subprocess import PIPE, Popen
-from typing import Any, Dict, Iterator, List, Optional, Union, overload, Iterable, Tuple
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    TypedDict,
+    Union,
+    overload,
+)
 
 from python_on_whales.client_config import (
     ClientConfig,
@@ -21,18 +31,36 @@ from python_on_whales.components.pod.models import (
     PodInspectResult,
 )
 from python_on_whales.components.volume.cli_wrapper import VolumeDefinition
-from python_on_whales.exceptions import DockerException, NoSuchPod
+from python_on_whales.exceptions import NoSuchPod
 from python_on_whales.utils import (
     ValidPath,
     ValidPortMapping,
     format_dict_for_cli,
     format_port_arg,
     format_signal_arg,
+    format_time_arg,
     join_if_not_none,
     run,
     stream_stdout_and_stderr,
     to_list,
-    format_time_arg,
+)
+
+
+PodListFilters = TypedDict(
+    "PodListFilters",
+    {
+        "ctr-ids": str,
+        "ctr-names": str,
+        "ctr-number": int,
+        "ctr-status": str,
+        "id": str,
+        "label": str,
+        "name": str,
+        "network": str,  # TODO: allow Network
+        "status": str,
+        "until": str,  # TODO: allow datetime
+    },
+    total=False,
 )
 
 
@@ -368,8 +396,8 @@ class PodCLI(DockerCLICaller):
 
     def kill(
         self,
-        /,
         x: Optional[Union[ValidPod, List[ValidPod]]] = None,
+        /,
         *,
         all: bool = False,
         latest: bool = False,
@@ -388,7 +416,7 @@ class PodCLI(DockerCLICaller):
 
         """
         pods = to_list(x)
-        if len(pods) == 0:
+        if len(pods) == 0 and not latest and not all:
             return
 
         full_cmd = self.docker_cmd + ["pod", "kill"]
@@ -396,9 +424,26 @@ class PodCLI(DockerCLICaller):
         full_cmd.add_flag("--all", all)
         full_cmd.add_flag("--latest", latest)
         full_cmd.add_simple_arg("--signal", format_signal_arg(signal))
-        full_cmd.extend(pods)
+        full_cmd.extend([str(p) for p in pods])
 
         run(full_cmd)
+
+    def list(self, *, filters: PodListFilters = {}) -> List[Pod]:
+        """List the pods on the host.
+
+        Parameters:
+            filters: Filters to apply when listing pods
+
+        # Returns
+            A `List[python_on_whales.Pod]`
+        """
+        full_cmd = self.docker_cmd + ["pod", "ps", "-q", "--no-trunc"]
+        full_cmd.add_args_list("--filter", format_dict_for_cli(filters))
+
+        return [
+            Pod(self.client_config, x, is_immutable_id=True)
+            for x in run(full_cmd).splitlines()
+        ]
 
     def logs(
         self,
@@ -474,10 +519,44 @@ class PodCLI(DockerCLICaller):
         else:
             return "".join(x[1].decode() for x in iterator)
 
+    def pause(
+        self,
+        x: Union[ValidPod, List[ValidPod]] = [],
+        /,
+        *,
+        all: bool = False,
+        latest: bool = False,
+    ) -> None:
+        """Pauses one or more pods
+
+        Parameters:
+            x: One or more pods to pause
+            all: Pause all pods
+            latest: Pause the latest pod
+
+        # Raises
+            `python_on_whales.exceptions.NoSuchPod` if any pods does not exist.
+        """
+        pods = to_list(x)
+        if len(pods) == 0 and not latest and not all:
+            return
+
+        full_cmd = self.docker_cmd + ["pod", "pause"]
+        full_cmd.add_flag("--all", all)
+        full_cmd.add_flag("--latest", latest)
+        full_cmd.extend([str(p) for p in pods])
+
+        run(full_cmd)
+
+    def prune(self) -> None:
+        """Remove pods that are not running."""
+        full_cmd = self.docker_cmd + ["pod", "prune", "--force"]
+        run(full_cmd)
+
     def remove(
         self,
+        x: Union[ValidPod, List[ValidPod]] = [],
         /,
-        x: Union[ValidPod, List[ValidPod]],
         *,
         all: bool = False,
         force: bool = False,
@@ -487,24 +566,167 @@ class PodCLI(DockerCLICaller):
         """Remove one or more pods.
 
         Parameters:
-            x: Single pod or list of pods to remove. You can use tags or
-                `python_on_whales.Pod` objects.
+            x: Single pod or list of pods to remove.
             all: Remove all pods
             force: Force removal of the pods
             ignore: Ignore errors when specified pod is missing
             time: Seconds to wait for pod stop before killing the containers
 
         # Raises
-            `python_on_whales.exceptions.NoSuchPod` if one of the pods does not exist.
+            `python_on_whales.exceptions.NoSuchPod` if any of the pods do not
+            exist and `ignore` was not set.
 
         """
         pods = to_list(x)
-        if len(pods) == 0:
+        if len(pods) == 0 and not all:
             return
         full_cmd = self.docker_cmd + ["pod", "rm"]
         full_cmd.add_flag("--all", all)
         full_cmd.add_flag("--force", force)
         full_cmd.add_flag("--ignore", ignore)
         full_cmd.add_simple_arg("--time", time)
-        full_cmd.extend(pods)
+        full_cmd.extend([str(p) for p in pods])
         run(full_cmd)
+
+    def restart(
+        self,
+        x: Union[ValidPod, List[ValidPod]] = [],
+        /,
+        *,
+        all: bool = False,
+        latest: bool = False,
+    ) -> None:
+        """Restarts one or more pods
+
+        Parameters:
+            x: One or more pods to restart
+            all: Restart all pods
+            latest: Restart the latest pod
+
+        # Raises
+            `python_on_whales.exceptions.NoSuchPod` if any pods does not exist.
+        """
+        pods = to_list(x)
+        if len(pods) == 0 and not latest and not all:
+            return
+
+        full_cmd = self.docker_cmd + ["pod", "restart"]
+        full_cmd.add_flag("--all", all)
+        full_cmd.add_flag("--latest", latest)
+        full_cmd.extend([str(p) for p in pods])
+
+        run(full_cmd)
+
+    def start(
+        self,
+        x: Union[ValidPod, List[ValidPod]] = [],
+        /,
+        *,
+        all: bool = False,
+        latest: bool = False,
+    ) -> None:
+        """Starts one or more pods
+
+        Parameters:
+            x: One or more pods to start
+            all: Start all pods
+            latest: Start the latest pod
+
+        # Raises
+            `python_on_whales.exceptions.NoSuchPod` if any pods does not exist.
+        """
+        pods = to_list(x)
+        if len(pods) == 0 and not latest and not all:
+            return
+
+        full_cmd = self.docker_cmd + ["pod", "start"]
+        full_cmd.add_flag("--all", all)
+        full_cmd.add_flag("--latest", latest)
+        full_cmd.extend([str(p) for p in pods])
+
+        run(full_cmd)
+
+    def stats(
+        self,
+        x: Union[ValidPod, List[ValidPod]] = [],
+        /,
+        *,
+        all: bool = False,
+        latest: bool = False,
+    ) -> List[PodStats]:
+        """Get pods resource usage statistics
+
+        The data unit is the byte.
+
+        Parameters:
+            x: One or a list of pods.
+            all: Get the stats of all pods, not just running ones.
+
+        # Returns
+            A `List[python_on_whales.PodStats]`.
+        """
+        raise NotImplementedError  # TODO: implement PodStats class
+
+        pods = to_list(x)
+        if len(pods) == 0 and not all and not latest:
+            return []
+
+        full_cmd = self.docker_cmd + [
+            "pod",
+            "stats",
+            "--format",
+            "{{json .}}",
+            "--no-stream",
+        ]
+        full_cmd.add_flag("--all", all)
+        full_cmd.add_flag("--latest", latest)
+
+        stats_output = run(full_cmd)
+        return [PodStats(json.loads(s)) for s in stats_output.splitlines()]
+
+    def top(self, pod: Optional[ValidPod] = None, *, latest: bool = False):
+        """Get the running processes of a pod
+
+        Not yet implemented"""
+        raise NotImplementedError
+
+    def unpause(
+        self,
+        /,
+        x: Union[ValidPod, List[ValidPod]] = [],
+        *,
+        all: bool = False,
+        latest: bool = False,
+    ) -> None:
+        """Unpauses one or more pods
+
+        Parameters:
+            x: One or more pods to unpause
+            all: Unpause all pods
+            latest: Unpause the latest pod
+
+        # Raises
+            `python_on_whales.exceptions.NoSuchPod` if any pod do not exist.
+        """
+        pods = to_list(x)
+        if len(pods) == 0 and not latest and not all:
+            return
+
+        full_cmd = self.docker_cmd + ["pod", "unpause"]
+        full_cmd.add_flag("--all", all)
+        full_cmd.add_flag("--latest", latest)
+        full_cmd.extend([str(p) for p in pods])
+
+        run(full_cmd)
+
+
+class PodStats:
+    def __init__(self, json_dict: Mapping[str, Any]):
+        """Takes a json_dict with pod stats from the CLI and
+        parses it.
+        """
+        # TODO: See ContainerStats class.
+
+    def __repr__(self):
+        attr = ", ".join(f"{key}={value}" for key, value in self.__dict__.items())
+        return f"<{self.__class__} object, attributes are {attr}>"

@@ -1,22 +1,23 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Mapping, Optional
 
+from python_on_whales.components.container.models import PortBinding
 from python_on_whales.utils import DockerCamelModel
 
 
 class PodInfraConfig(DockerCamelModel):
-    port_bindings: Optional[Dict[...]] = None
+    port_bindings: Optional[Mapping[str, Optional[List[PortBinding]]]] = None
     host_network: Optional[bool] = None
     static_ip: Optional[str] = None
     static_mac: Optional[str] = None
     no_manage_resolv_conf: Optional[bool] = None
-    dns_server: Optional[...] = None
-    dns_search: Optional[...] = None
-    dns_option: Optional[...] = None
+    dns_server: Optional[List[str]] = None
+    dns_search: Optional[List[str]] = None
+    dns_option: Optional[List[str]] = None
     no_manage_hosts: Optional[bool] = None
-    host_add: Optional[...] = None
-    networks: Optional[...] = None
-    network_options: Optional[...] = None
+    host_add: Optional[List[str]] = None
+    networks: Optional[List[str]] = None
+    network_options: Optional[List[str]] = None
     pid_ns: Optional[str] = None
     userns: Optional[str] = None
     uts_ns: Optional[str] = None

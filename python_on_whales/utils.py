@@ -17,6 +17,7 @@ from python_on_whales.exceptions import (
     DockerException,
     NoSuchContainer,
     NoSuchImage,
+    NoSuchPod,
     NoSuchService,
     NoSuchVolume,
     NotASwarmManager,
@@ -171,6 +172,13 @@ def run(
                 )
             if "no such container" in decoded_stderr:
                 raise NoSuchContainer(
+                    args,
+                    completed_process.returncode,
+                    completed_process.stdout,
+                    completed_process.stderr,
+                )
+            if "no such pod" in decoded_stderr:
+                raise NoSuchPod(
                     args,
                     completed_process.returncode,
                     completed_process.stdout,
