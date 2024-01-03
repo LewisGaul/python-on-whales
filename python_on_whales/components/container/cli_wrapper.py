@@ -439,7 +439,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_simple_arg("--detach-keys", detach_keys)
         full_cmd.add_flag("--no-stdin", not stdin)
         full_cmd.add_flag("--sig-proxy", sig_proxy)
-        full_cmd.append(container)
+        full_cmd.append(str(container))
 
         run(full_cmd, tty=True)
 
@@ -462,11 +462,8 @@ class ContainerCLI(DockerCLICaller):
         """
         full_cmd = self.docker_cmd + ["container", "commit"]
 
-        if author is not None:
-            full_cmd += ["--author", author]
-
-        if message is not None:
-            full_cmd += ["--message", message]
+        full_cmd.add_simple_arg(["--author", author])
+        full_cmd.add_simple_arg(["--message", message])
 
         # TODO: fixme
         # full_cmd += ["--pause", str(pause).lower()]
@@ -561,21 +558,21 @@ class ContainerCLI(DockerCLICaller):
         envs: Dict[str, str] = {},
         env_files: Union[ValidPath, List[ValidPath]] = [],
         expose: Union[int, List[int]] = [],
-        gpus: Union[int, str, None] = None,
+        gpus: Optional[Union[int, str]] = None,
         groups_add: List[str] = [],
         healthcheck: bool = True,
         health_cmd: Optional[str] = None,
-        health_interval: Union[None, int, timedelta] = None,
+        health_interval: Optional[Union[int, timedelta]] = None,
         health_retries: Optional[int] = None,
-        health_start_period: Union[None, int, timedelta] = None,
-        health_timeout: Union[None, int, timedelta] = None,
+        health_start_period: Optional[Union[int, timedelta]] = None,
+        health_timeout: Optional[Union[int, timedelta]] = None,
         hostname: Optional[str] = None,
         init: bool = False,
         ip: Optional[str] = None,
         ip6: Optional[str] = None,
         ipc: Optional[str] = None,
         isolation: Optional[str] = None,
-        kernel_memory: Union[int, str, None] = None,
+        kernel_memory: Optional[Union[int, str]] = None,
         labels: Dict[str, str] = {},
         label_files: List[ValidPath] = [],
         link: List[ValidContainer] = [],
@@ -583,9 +580,9 @@ class ContainerCLI(DockerCLICaller):
         log_driver: Optional[str] = None,
         log_options: List[str] = [],
         mac_address: Optional[str] = None,
-        memory: Union[int, str, None] = None,
-        memory_reservation: Union[int, str, None] = None,
-        memory_swap: Union[int, str, None] = None,
+        memory: Optional[Union[int, str]] = None,
+        memory_reservation: Optional[Union[int, str]] = None,
+        memory_swap: Optional[Union[int, str]] = None,
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
@@ -605,7 +602,7 @@ class ContainerCLI(DockerCLICaller):
         remove: bool = False,
         runtime: Optional[str] = None,
         security_options: List[str] = [],
-        shm_size: Union[int, str, None] = None,
+        shm_size: Optional[Union[int, str]] = None,
         sig_proxy: bool = True,
         stop_signal: Optional[Union[int, str]] = None,
         stop_timeout: Optional[int] = None,
@@ -732,8 +729,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_simple_arg("--memory-swap", memory_swap)
         full_cmd.add_simple_arg("--memory-swappiness", memory_swappiness)
 
-        mounts = [",".join(x) for x in mounts]
-        full_cmd.add_args_list("--mount", mounts)
+        full_cmd.add_args_list("--mount", [",".join(x) for x in mounts])
         full_cmd.add_simple_arg("--name", name)
 
         full_cmd.add_args_list("--network", networks)
@@ -786,8 +782,8 @@ class ContainerCLI(DockerCLICaller):
 
         full_cmd.add_simple_arg("--workdir", workdir)
 
-        full_cmd.append(image)
-        full_cmd += command
+        full_cmd.append(str(image))
+        full_cmd.extend(command)
         return Container(self.client_config, run(full_cmd), is_immutable_id=True)
 
     def diff(self, container: ValidContainer) -> Dict[str, str]:
@@ -995,7 +991,7 @@ class ContainerCLI(DockerCLICaller):
         containers: Union[ValidContainer, List[ValidContainer]],
         signal: Optional[Union[int, str]] = None,
     ) -> None:
-        """Kill a container.
+        """Kill one or more containers.
 
         Alias: `docker.kill(...)`
 
@@ -1004,7 +1000,8 @@ class ContainerCLI(DockerCLICaller):
             signal: The signal to send the container
 
         # Raises
-            `python_on_whales.exceptions.NoSuchContainer` if the container does not exists.
+            `python_on_whales.exceptions.NoSuchContainer` if any of the
+            containers do not exist.
 
         """
         containers = to_list(containers)
@@ -1014,13 +1011,13 @@ class ContainerCLI(DockerCLICaller):
         full_cmd = self.docker_cmd + ["container", "kill"]
 
         full_cmd.add_simple_arg("--signal", format_signal_arg(signal))
-        full_cmd += containers
+        full_cmd.extend(str(c) for c in containers)
 
         run(full_cmd)
 
     def logs(
         self,
-        container: Union[Container, str],
+        container: ValidContainer,
         *,
         details: bool = False,
         since: Union[None, datetime, timedelta] = None,
@@ -1082,7 +1079,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_flag("--timestamps", timestamps)
         full_cmd.add_simple_arg("--until", format_time_arg(until))
         full_cmd.add_flag("--follow", follow)
-        full_cmd.append(container)
+        full_cmd.append(str(container))
 
         iterator = stream_stdout_and_stderr(full_cmd)
 
@@ -1132,8 +1129,7 @@ class ContainerCLI(DockerCLICaller):
             # nothing to do
             return
         full_cmd = self.docker_cmd + ["pause"]
-        for container in to_list(containers):
-            full_cmd.append(str(container))
+        full_cmd.extend(str(c) for c in containers)
 
         run(full_cmd)
 
@@ -1163,7 +1159,7 @@ class ContainerCLI(DockerCLICaller):
             new_name: The new name of the container.
 
         # Raises
-            `python_on_whales.exceptions.NoSuchContainer` if the container does not exists.
+            `python_on_whales.exceptions.NoSuchContainer` if the container does not exist.
         """
         full_cmd = self.docker_cmd + ["container", "rename", str(container), new_name]
         run(full_cmd)
@@ -1203,7 +1199,7 @@ class ContainerCLI(DockerCLICaller):
 
     def remove(
         self,
-        containers: Union[Container, str, List[Union[Container, str]]],
+        containers: Union[ValidContainer, List[ValidContainer]],
         *,
         force: bool = False,
         volumes: bool = False,
@@ -1228,8 +1224,7 @@ class ContainerCLI(DockerCLICaller):
         full_cmd.add_flag("--force", force)
         full_cmd.add_flag("--volumes", volumes)
 
-        for container in containers:
-            full_cmd.append(str(container))
+        full_cmd.extend(str(c) for c in containers)
 
         run(full_cmd)
 
@@ -1270,14 +1265,14 @@ class ContainerCLI(DockerCLICaller):
         envs: Dict[str, str] = {},
         env_files: Union[ValidPath, List[ValidPath]] = [],
         expose: Union[int, List[int]] = [],
-        gpus: Union[int, str, None] = None,
+        gpus: Optional[Union[int, str]] = None,
         groups_add: List[str] = [],
         healthcheck: bool = True,
         health_cmd: Optional[str] = None,
-        health_interval: Union[None, int, timedelta] = None,
+        health_interval: Optional[Union[int, timedelta]] = None,
         health_retries: Optional[int] = None,
-        health_start_period: Union[None, int, timedelta] = None,
-        health_timeout: Union[None, int, timedelta] = None,
+        health_start_period: Optional[Union[int, timedelta]] = None,
+        health_timeout: Optional[Union[int, timedelta]] = None,
         hostname: Optional[str] = None,
         init: bool = False,
         interactive: bool = False,
@@ -1285,7 +1280,7 @@ class ContainerCLI(DockerCLICaller):
         ip6: Optional[str] = None,
         ipc: Optional[str] = None,
         isolation: Optional[str] = None,
-        kernel_memory: Union[int, str, None] = None,
+        kernel_memory: Optional[Union[int, str]] = None,
         labels: Dict[str, str] = {},
         label_files: List[ValidPath] = [],
         link: List[ValidContainer] = [],
@@ -1293,9 +1288,9 @@ class ContainerCLI(DockerCLICaller):
         log_driver: Optional[str] = None,
         log_options: List[str] = [],
         mac_address: Optional[str] = None,
-        memory: Union[int, str, None] = None,
-        memory_reservation: Union[int, str, None] = None,
-        memory_swap: Union[int, str, None] = None,
+        memory: Optional[Union[int, str]] = None,
+        memory_reservation: Optional[Union[int, str]] = None,
+        memory_swap: Optional[Union[int, str]] = None,
         memory_swappiness: Optional[int] = None,
         mounts: List[List[str]] = [],
         name: Optional[str] = None,
@@ -1315,7 +1310,7 @@ class ContainerCLI(DockerCLICaller):
         remove: bool = False,
         runtime: Optional[str] = None,
         security_options: List[str] = [],
-        shm_size: Union[int, str, None] = None,
+        shm_size: Optional[Union[int, str]] = None,
         sig_proxy: bool = True,
         stop_signal: Optional[Union[int, str]] = None,
         stop_timeout: Optional[int] = None,
@@ -1744,6 +1739,10 @@ class ContainerCLI(DockerCLICaller):
         # Returns
             A `List[python_on_whales.ContainerStats]`.
         """
+        containers = [] if containers is None else to_list(containers)
+        if len(containers) == 0 and not all:
+            return []
+
         full_cmd = self.docker_cmd + [
             "container",
             "stats",
@@ -1754,22 +1753,14 @@ class ContainerCLI(DockerCLICaller):
         ]
         full_cmd.add_flag("--all", all)
 
-        if containers == []:
-            return []
-        elif containers is None:
-            # the user didn't provide any filters
-            pass
-        else:
-            full_cmd += to_list(containers)
-
         stats_output = run(full_cmd)
         return [ContainerStats(json.loads(x)) for x in stats_output.splitlines()]
 
     def stop(
         self,
         containers: Union[ValidContainer, List[ValidContainer]],
-        time: Union[int, timedelta] = None,
-    ):
+        time: Optional[Union[int, timedelta]] = None,
+    ) -> None:
         """Stops one or more running containers
 
         Alias: `docker.stop(...)`
@@ -1782,21 +1773,16 @@ class ContainerCLI(DockerCLICaller):
             time: Seconds to wait for stop before killing a container (default 10)
 
         # Raises
-            `python_on_whales.exceptions.NoSuchContainer` if the container does not exists.
+            `python_on_whales.exceptions.NoSuchContainer` if any of the
+            containers do not exist.
         """
         containers = to_list(containers)
-        if containers == []:
+        if len(containers) == 0:
             # nothing to do
             return
         full_cmd = self.docker_cmd + ["container", "stop"]
-        if isinstance(time, timedelta):
-            time = time.total_seconds()
-
-        if time is not None:
-            full_cmd += ["--time", str(time)]
-
-        for container in containers:
-            full_cmd.append(container)
+        full_cmd.add_simple_arg("--time", format_time_arg(time))
+        full_cmd.extend(str(c) for c in containers)
 
         run(full_cmd)
 
@@ -1817,14 +1803,15 @@ class ContainerCLI(DockerCLICaller):
             x: One or more containers (name, id or `python_on_whales.Container` object).
 
         # Raises
-            `python_on_whales.exceptions.NoSuchContainer` if the container does not exists.
+            `python_on_whales.exceptions.NoSuchContainer` if any of the
+            containers do not exist.
         """
-        x = to_list(x)
-        if x == []:
+        containers = to_list(x)
+        if len(containers) == 0:
             # nothing to do
             return
         full_cmd = self.docker_cmd + ["container", "unpause"]
-        full_cmd += x
+        full_cmd.extend(str(c) for c in containers)
         run(full_cmd)
 
     def update(
