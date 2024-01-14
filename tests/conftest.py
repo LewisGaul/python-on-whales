@@ -61,9 +61,7 @@ def docker_client(pytestconfig: pytest.Config) -> DockerClient:
 
 
 @pytest.fixture(scope="session")
-def podman_client(
-    pytestconfig: pytest.Config, request: pytest.FixtureRequest
-) -> DockerClient:
+def podman_client(pytestconfig: pytest.Config) -> DockerClient:
     return _get_ctr_client("podman", pytestconfig)
 
 
@@ -76,19 +74,21 @@ def ctr_client(request: pytest.FixtureRequest) -> DockerClient:
 
 
 @pytest.fixture(scope="function")
-def docker_registry(docker_client: DockerClient) -> Generator[str, None, None]:
-    yield from _docker_registry(docker_client)
+def registry(ctr_client: DockerClient) -> Generator[str, None, None]:
+    yield from _create_registry(ctr_client)
 
 
 @pytest.fixture(scope="function")
-def docker_registry_without_login(
-    docker_client: DockerClient,
+def registry_without_login(ctr_client: DockerClient) -> Generator[str, None, None]:
+    yield from _create_registry(ctr_client, login=False)
+
+
+def _create_registry(
+    ctr_client: DockerClient, login=True
 ) -> Generator[str, None, None]:
-    yield from _docker_registry(docker_client, login=False)
-
-
-def _docker_registry(docker_client: DockerClient, login=True) -> str:
-    encrypted_password = docker_client.run(
+    if ctr_client.client_config.client_type == "podman":
+        pytest.xfail("Unable to create registry for podman")
+    encrypted_password = ctr_client.run(
         "mhenry07/apache2-utils",
         ["htpasswd", "-Bbn", "my_user", "my_password"],
         remove=True,
@@ -97,7 +97,7 @@ def _docker_registry(docker_client: DockerClient, login=True) -> str:
         tmp_path = Path(tmp_path)
         htpasswd_file = tmp_path / "htpasswd"
         htpasswd_file.write_text(encrypted_password)
-        registry = docker_client.container.create(
+        registry = ctr_client.container.create(
             "registry:2",
             remove=True,
             envs=dict(
@@ -112,7 +112,7 @@ def _docker_registry(docker_client: DockerClient, login=True) -> str:
             registry.start()
             time.sleep(1.5)
             if login:
-                docker_client.login(
+                ctr_client.login(
                     "localhost:5000", username="my_user", password="my_password"
                 )
             yield "localhost:5000"

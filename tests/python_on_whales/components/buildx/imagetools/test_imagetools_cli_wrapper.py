@@ -34,37 +34,37 @@ def test_imagetools_create_single_image_with_hash():
     assert a.media_type.startswith("application/")
 
 
-def test_imagetools_create_new_image_with_tag(docker_registry):
+def test_imagetools_create_new_image_with_tag(registry):
     busybox = docker.pull("busybox:1")
-    base_image = f"{docker_registry}/test:image1"
+    base_image = f"{registry}/test:image1"
     docker.tag(busybox, base_image)
     docker.push(base_image)
-    new_image = f"{docker_registry}/test:image2"
+    new_image = f"{registry}/test:image2"
     docker.buildx.imagetools.create([base_image], tags=[new_image])
     docker.pull(new_image)
 
 
-def test_imagetools_create_new_image_with_tags(docker_registry):
+def test_imagetools_create_new_image_with_tags(registry):
     busybox = docker.pull("busybox:1")
-    base_image = f"{docker_registry}/test:image1"
+    base_image = f"{registry}/test:image1"
     docker.tag(busybox, base_image)
     docker.push(base_image)
-    new_image_2 = f"{docker_registry}/test:image2"
-    new_image_3 = f"{docker_registry}/test:image3"
+    new_image_2 = f"{registry}/test:image2"
+    new_image_3 = f"{registry}/test:image3"
     docker.buildx.imagetools.create([base_image], tags=[new_image_2, new_image_3])
     docker.pull([new_image_2, new_image_3])
 
 
-def test_imagetools_append(docker_registry):
+def test_imagetools_append(registry):
     busybox = docker.pull("busybox:1")
     alpine = docker.pull("alpine")
-    base_image_busybox = f"{docker_registry}/test:busybox"
-    base_image_alpine = f"{docker_registry}/test:alpine"
+    base_image_busybox = f"{registry}/test:busybox"
+    base_image_alpine = f"{registry}/test:alpine"
     docker.tag(busybox, base_image_busybox)
     docker.tag(alpine, base_image_alpine)
     docker.push(base_image_busybox)
     docker.push(base_image_alpine)
-    new_image = f"{docker_registry}/test:image2"
+    new_image = f"{registry}/test:image2"
     docker.buildx.imagetools.create([base_image_busybox], tags=[new_image])
     docker.buildx.imagetools.create([base_image_alpine], tags=[new_image], append=True)
     docker.pull(new_image)

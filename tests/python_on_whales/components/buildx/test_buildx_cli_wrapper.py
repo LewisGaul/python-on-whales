@@ -109,31 +109,29 @@ def test_legacy_build_simple_case(tmp_path):
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_build_push_registry(tmp_path, docker_registry):
+def test_buildx_build_push_registry(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
     with docker.buildx.create(use=True, driver_options=dict(network="host")):
-        output = docker.buildx.build(
-            tmp_path, push=True, tags=f"{docker_registry}/dodo"
-        )
+        output = docker.buildx.build(tmp_path, push=True, tags=f"{registry}/dodo")
     assert output is None
-    docker.pull(f"{docker_registry}/dodo")
+    docker.pull(f"{registry}/dodo")
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_build_push_registry_override_builder(tmp_path, docker_registry):
+def test_buildx_build_push_registry_override_builder(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
     with docker.buildx.create(driver_options=dict(network="host")) as my_builder:
         output = docker.buildx.build(
-            tmp_path, push=True, tags=f"{docker_registry}/dodo", builder=my_builder
+            tmp_path, push=True, tags=f"{registry}/dodo", builder=my_builder
         )
     assert output is None
-    docker.pull(f"{docker_registry}/dodo")
+    docker.pull(f"{registry}/dodo")
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_caching(tmp_path, docker_registry):
+def test_buildx_caching(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
-    cache = f"{docker_registry}/project:cache"
+    cache = f"{registry}/project:cache"
     with docker.buildx.create(driver_options=dict(network="host"), use=True):
         docker.buildx.build(tmp_path, cache_to=cache)
 
@@ -142,9 +140,9 @@ def test_buildx_caching(tmp_path, docker_registry):
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_caching_both_name_time(tmp_path, docker_registry):
+def test_buildx_caching_both_name_time(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
-    cache = f"{docker_registry}/project:cache"
+    cache = f"{registry}/project:cache"
     with docker.buildx.create(driver_options=dict(network="host"), use=True):
         docker.buildx.build(tmp_path, cache_to=cache, cache_from=cache)
 
@@ -180,25 +178,25 @@ def test_buildx_caching_list_form(tmp_path):
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_build_output_type_registry(tmp_path, docker_registry):
+def test_buildx_build_output_type_registry(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
     with docker.buildx.create(use=True, driver_options=dict(network="host")):
         output = docker.buildx.build(
-            tmp_path, output=dict(type="registry"), tags=f"{docker_registry}/dodo"
+            tmp_path, output=dict(type="registry"), tags=f"{registry}/dodo"
         )
     assert output is None
-    docker.pull(f"{docker_registry}/dodo")
+    docker.pull(f"{registry}/dodo")
 
 
 @pytest.mark.usefixtures("with_docker_driver")
-def test_buildx_build_push_registry_multiple_tags(tmp_path, docker_registry):
+def test_buildx_build_push_registry_multiple_tags(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
-    tags = [f"{docker_registry}/dodo:1", f"{docker_registry}/dada:1"]
+    tags = [f"{registry}/dodo:1", f"{registry}/dada:1"]
     with docker.buildx.create(use=True, driver_options=dict(network="host")):
         output = docker.buildx.build(tmp_path, push=True, tags=tags)
     assert output is None
-    docker.pull(f"{docker_registry}/dodo:1")
-    docker.pull(f"{docker_registry}/dada:1")
+    docker.pull(f"{registry}/dodo:1")
+    docker.pull(f"{registry}/dada:1")
 
 
 @pytest.mark.usefixtures("with_container_driver")
@@ -259,15 +257,15 @@ def _test_buildx_build_output_local(tmp_path):
     assert (tmp_path / "my_image/dada").is_file()
 
 
-def test_multiarch_build(tmp_path, docker_registry):
+def test_multiarch_build(tmp_path, registry):
     (tmp_path / "Dockerfile").write_text(dockerfile_content1)
-    tags = [f"{docker_registry}/dodo:1"]
+    tags = [f"{registry}/dodo:1"]
     with docker.buildx.create(use=True, driver_options=dict(network="host")):
         output = docker.buildx.build(
             tmp_path, push=True, tags=tags, platforms=["linux/amd64", "linux/arm64"]
         )
     assert output is None
-    docker.pull(f"{docker_registry}/dodo:1")
+    docker.pull(f"{registry}/dodo:1")
 
 
 @pytest.mark.usefixtures("with_container_driver")
