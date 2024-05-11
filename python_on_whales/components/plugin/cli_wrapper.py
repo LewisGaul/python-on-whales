@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Mapping, Optional, Union, overload
 
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.plugin.models import (
     PluginConfig,
@@ -16,7 +16,7 @@ from python_on_whales.components.plugin.models import (
 from python_on_whales.utils import ValidPath, run, to_list
 
 
-class Plugin(ReloadableObjectFromJson):
+class Plugin(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -28,11 +28,11 @@ class Plugin(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove(force=True)
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["plugin", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]) -> PluginInspectResult:
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]) -> PluginInspectResult:
         return PluginInspectResult(**json_object)
 
     def _get_inspect_result(self) -> PluginInspectResult:

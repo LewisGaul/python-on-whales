@@ -10,6 +10,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Tuple,
     TypedDict,
@@ -26,7 +27,7 @@ import python_on_whales.components.volume.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.container.models import (
     ContainerConfig,
@@ -79,7 +80,7 @@ DockerContainerListFilters = TypedDict(
 )
 
 
-class Container(ReloadableObjectFromJson):
+class Container(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -95,11 +96,11 @@ class Container(ReloadableObjectFromJson):
         if not autoremove:
             self.remove(volumes=True)
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["container", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]):
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]):
         return ContainerInspectResult(**json_object)
 
     def _get_inspect_result(self) -> ContainerInspectResult:

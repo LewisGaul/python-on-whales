@@ -7,8 +7,10 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Mapping,
     Optional,
+    Self,
     Sequence,
     Tuple,
     TypedDict,
@@ -22,7 +24,7 @@ import python_on_whales.components.network.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.pod.models import (
     PodContainer,
@@ -62,11 +64,21 @@ PodListFilters = TypedDict(
 )
 
 
-class Pod(ReloadableObjectFromJson):
+class Pod(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
         super().__init__(client_config, "id", reference, is_immutable_id)
+
+    @classmethod
+    def latest(cls, client_config: ClientConfig) -> Self:
+        cli_caller = DockerCLICaller(client_config)
+        json_str = run(cli_caller.docker_cmd + ["pod", "inspect", "--latest"])
+        json_obj = json.loads(json_str)
+        inspect_result = cls._parse_inspect_result(json_obj)
+        self = cls(client_config, reference=inspect_result.id, is_immutable_id=True)
+        cls._set_inspect_result(inspect_result)
+        return self
 
     def __enter__(self):
         return self
@@ -74,11 +86,12 @@ class Pod(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove(force=True)
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["pod", "inspect", reference])
         return json.loads(json_str)
 
-    def _parse_json_object(self, json_object: Mapping[str, Any]) -> PodInspectResult:
+    @staticmethod
+    def _parse_inspect_result(cls, json_object: Mapping[str, Any]) -> PodInspectResult:
         return PodInspectResult(**json_object)
 
     def _get_inspect_result(self) -> PodInspectResult:
@@ -379,15 +392,22 @@ class PodCLI(DockerCLICaller):
             return True
 
     @overload
-    def inspect(self, x: ValidPod, /) -> Pod:
+    def inspect(self, x: ValidPod, /, *, latest: Literal[False]) -> Pod:
         ...
 
     @overload
-    def inspect(self, x: List[ValidPod], /) -> List[Pod]:
+    def inspect(self, x: Sequence[ValidPod], /, *, latest: Literal[False]) -> List[Pod]:
+        ...
+
+    @overload
+    def inspect(self, x: None, /, *, latest: Literal[True]) -> Pod:
         ...
 
     def inspect(
-        self, x: Union[ValidPod, Sequence[ValidPod]], /
+        self,
+        x: Optional[Union[ValidPod, Sequence[ValidPod]]] = None,
+        /,
+        latest: bool = False,
     ) -> Union[Pod, List[Pod]]:
         """Creates a `python_on_whales.Pod` object.
 
@@ -399,10 +419,34 @@ class PodCLI(DockerCLICaller):
             `python_on_whales.exceptions.NoSuchPod` if one of the pods does not exist.
 
         """
-        if isinstance(x, list):
+        if x and latest or x is None and not latest:
+            raise TypeError("Exactly one of 'x' or 'latest' must be given")
+
+        if latest:
+            return Pod.latest()
+        elif isinstance(x, list):
             return [Pod(self.client_config, identifier) for identifier in x]
         else:
             return Pod(self.client_config, x)
+
+    @overload
+    def kill(
+        self,
+        x: Union[ValidPod, Sequence[ValidPod]],
+        /,
+        *,
+        all: Literal[False],
+        latest: Literal[False],
+    ) -> None:
+        ...
+
+    @overload
+    def kill(self, x: None, /, *, all: Literal[True], latest: Literal[False]) -> None:
+        ...
+
+    @overload
+    def kill(self, x: None, /, *, all: Literal[False], latest: Literal[True]) -> None:
+        ...
 
     def kill(
         self,

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Literal, Optional, Union, overload
+from typing import Any, Dict, List, Literal, Mapping, Optional, Union, overload
 
 import python_on_whales.components.task.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.container.cli_wrapper import to_seconds
 from python_on_whales.components.service.models import (
@@ -29,7 +29,7 @@ from python_on_whales.utils import (
 )
 
 
-class Service(ReloadableObjectFromJson):
+class Service(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -41,11 +41,13 @@ class Service(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove()
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["service", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]) -> ServiceInspectResult:
+    def _parse_inspect_result(
+        self, json_object: Mapping[str, Any]
+    ) -> ServiceInspectResult:
         return ServiceInspectResult(**json_object)
 
     def _get_inspect_result(self) -> ServiceInspectResult:

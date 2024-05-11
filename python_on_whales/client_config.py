@@ -5,7 +5,7 @@ import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, List, Literal, Mapping, Optional, Union
 
 import pydantic
 
@@ -183,9 +183,7 @@ class ReloadableObject(DockerCLICaller):
         if is_immutable_id:
             self._immutable_id = reference_or_id
         else:
-            self._set_inspect_result(
-                self._fetch_and_parse_inspect_result(reference_or_id)
-            )
+            self._update_inspect_result(reference_or_id)
             self._immutable_id = getattr(self._inspect_result, self._id_in_inspect)
 
     def __eq__(self, other):
@@ -205,11 +203,32 @@ class ReloadableObject(DockerCLICaller):
         )
 
     def reload(self):
-        self._set_inspect_result(
-            self._fetch_and_parse_inspect_result(self._immutable_id)
-        )
+        self._update_inspect_result(self._immutable_id)
 
-    def _fetch_and_parse_inspect_result(self, reference: str):
+    def _update_inspect_result(self, reference: str) -> None:
+        json_object = self._fetch_inspect_result_json(reference)
+        try:
+            inspect_result = self._parse_inspect_result(json_object)
+        except pydantic.ValidationError as err:
+            fd, json_response_file = tempfile.mkstemp(suffix=".json", text=True)
+            with open(json_response_file, "w") as f:
+                json.dump(json_object, f, indent=2)
+            raise ParsingError(
+                f"There was an error parsing the json response from the Docker daemon. \n"
+                f"This is a bug with python-on-whales itself. Please head to \n"
+                f"https://github.com/gabrieldemarmiesse/python-on-whales/issues \n"
+                f"and open an issue. You should copy this error message and \n"
+                f"the json response from the Docker daemon. The json response was put \n"
+                f"in {json_response_file} because it's a bit too big to be printed \n"
+                f"on the screen. Make sure that there are no sensitive data in the \n"
+                f"json file before copying it in the github issue."
+            ) from err
+        self._set_inspect_result(inspect_result)
+
+    def _fetch_inspect_result_json(self, reference: str) -> Mapping[str, Any]:
+        raise NotImplementedError
+
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]):
         raise NotImplementedError
 
     def _get_inspect_result(self):
@@ -231,38 +250,10 @@ class ReloadableObject(DockerCLICaller):
         return hash(self._get_immutable_id())
 
 
-class ReloadableObjectFromJson(ReloadableObject):
-    def _fetch_inspect_result_json(self, reference):
-        raise NotImplementedError
-
-    def _parse_json_object(self, json_object: Dict[str, Any]):
-        raise NotImplementedError
-
-    def _fetch_and_parse_inspect_result(self, reference: str):
-        json_object = self._fetch_inspect_result_json(reference)
-        try:
-            return self._parse_json_object(json_object)
-        except pydantic.ValidationError as err:
-            fd, json_response_file = tempfile.mkstemp(suffix=".json", text=True)
-            with open(json_response_file, "w") as f:
-                json.dump(json_object, f, indent=2)
-
-            raise ParsingError(
-                f"There was an error parsing the json response from the Docker daemon. \n"
-                f"This is a bug with python-on-whales itself. Please head to \n"
-                f"https://github.com/gabrieldemarmiesse/python-on-whales/issues \n"
-                f"and open an issue. You should copy this error message and \n"
-                f"the json response from the Docker daemon. The json response was put \n"
-                f"in {json_response_file} because it's a bit too big to be printed \n"
-                f"on the screen. Make sure that there are no sensitive data in the \n"
-                f"json file before copying it in the github issue."
-            ) from err
-
-
-def bulk_reload(docker_objects: List[ReloadableObjectFromJson]):
+def bulk_reload(docker_objects: List[ReloadableObject]):
     assert len(set(x.client_config for x in docker_objects)) == 1
     all_ids = [x._get_immutable_id() for x in docker_objects]
     full_cmd = docker_objects[0].docker_cmd + ["inspect"] + all_ids
     json_str = run(full_cmd)
     for json_obj, docker_object in zip(json.loads(json_str), docker_objects):
-        docker_object._set_inspect_result(docker_object._parse_json_object(json_obj))
+        docker_object._set_inspect_result(docker_object._parse_inspect_result(json_obj))

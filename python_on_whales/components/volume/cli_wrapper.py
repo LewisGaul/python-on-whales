@@ -5,7 +5,7 @@ import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, overload
 
 import python_on_whales.components.buildx
 import python_on_whales.components.container
@@ -13,7 +13,7 @@ import python_on_whales.components.image
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.volume.models import VolumeInspectResult
 from python_on_whales.exceptions import NoSuchVolume
@@ -21,7 +21,7 @@ from python_on_whales.test_utils import random_name
 from python_on_whales.utils import ValidPath, format_dict_for_cli, run, to_list
 
 
-class Volume(ReloadableObjectFromJson):
+class Volume(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -33,11 +33,11 @@ class Volume(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove()
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["volume", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]):
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]):
         return VolumeInspectResult(**json_object)
 
     def _get_inspect_result(self) -> VolumeInspectResult:

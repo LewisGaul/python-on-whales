@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Mapping, Optional, Union, overload
 
 import python_on_whales.components.task.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.node.models import (
     NodeDescription,
@@ -21,17 +21,17 @@ from python_on_whales.components.node.models import (
 from python_on_whales.utils import run, to_list
 
 
-class Node(ReloadableObjectFromJson):
+class Node(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
         super().__init__(client_config, "id", reference, is_immutable_id)
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["node", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]) -> NodeInspectResult:
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]) -> NodeInspectResult:
         return NodeInspectResult(**json_object)
 
     def _get_inspect_result(self) -> NodeInspectResult:

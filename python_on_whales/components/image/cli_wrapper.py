@@ -6,13 +6,13 @@ from datetime import datetime
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any, Dict, Iterator, List, Optional, Union, overload
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Union, overload
 
 import python_on_whales.components.buildx.cli_wrapper
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.container.cli_wrapper import (
     ContainerCLI,
@@ -33,7 +33,7 @@ from python_on_whales.utils import (
 )
 
 
-class Image(ReloadableObjectFromJson):
+class Image(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -45,11 +45,11 @@ class Image(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove(force=True)
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["image", "inspect", reference])
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]) -> ImageInspectResult:
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]) -> ImageInspectResult:
         return ImageInspectResult(**json_object)
 
     def _get_inspect_result(self) -> ImageInspectResult:

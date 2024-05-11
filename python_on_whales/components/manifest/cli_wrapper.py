@@ -1,17 +1,17 @@
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Mapping, Optional, Union
 
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.buildx.imagetools.models import ImageVariantManifest
 from python_on_whales.components.manifest.models import ManifestListInspectResult
 from python_on_whales.utils import run, to_list
 
 
-class ManifestList(ReloadableObjectFromJson):
+class ManifestList(ReloadableObject):
     def __init__(
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
@@ -24,12 +24,12 @@ class ManifestList(ReloadableObjectFromJson):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove()
 
-    def _fetch_inspect_result_json(self, reference):
+    def _fetch_inspect_result_json(self, reference: str):
         json_str = run(self.docker_cmd + ["manifest", "inspect", reference])
         return json.loads(json_str)
 
-    def _parse_json_object(
-        self, json_object: Dict[str, Any]
+    def _parse_inspect_result(
+        self, json_object: Mapping[str, Any]
     ) -> ManifestListInspectResult:
         json_object["name"] = self.reference
         return ManifestListInspectResult(**json_object)

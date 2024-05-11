@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, overload
+from typing import Any, Dict, List, Mapping, Optional, Union, overload
 
 from python_on_whales.client_config import (
     ClientConfig,
     DockerCLICaller,
-    ReloadableObjectFromJson,
+    ReloadableObject,
 )
 from python_on_whales.components.context.models import (
     ContextEndpoint,
@@ -18,7 +18,7 @@ from python_on_whales.components.context.models import (
 from python_on_whales.utils import run, to_list
 
 
-class Context(ReloadableObjectFromJson):
+class Context(ReloadableObject):
     def __init__(
         self,
         client_config: ClientConfig,
@@ -40,7 +40,7 @@ class Context(ReloadableObjectFromJson):
         json_str = run(full_cmd)
         return json.loads(json_str)[0]
 
-    def _parse_json_object(self, json_object: Dict[str, Any]):
+    def _parse_inspect_result(self, json_object: Mapping[str, Any]):
         return ContextInspectResult(**json_object)
 
     def _get_inspect_result(self) -> ContextInspectResult:
