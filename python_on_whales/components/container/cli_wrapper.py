@@ -12,6 +12,7 @@ from typing import (
     Literal,
     Mapping,
     Optional,
+    Self,
     Tuple,
     TypedDict,
     Union,
@@ -85,6 +86,19 @@ class Container(ReloadableObject):
         self, client_config: ClientConfig, reference: str, is_immutable_id=False
     ):
         super().__init__(client_config, "id", reference, is_immutable_id)
+
+    @classmethod
+    def latest(cls, client_config: ClientConfig) -> Self:
+        """
+        Get the last created container (only supported by podman).
+        """
+        cli_caller = DockerCLICaller(client_config)
+        json_str = run(cli_caller.docker_cmd + ["container", "inspect", "--latest"])
+        json_obj = json.loads(json_str)
+        inspect_result = cls._parse_inspect_result(json_obj)
+        self = cls(client_config, reference=inspect_result.id, is_immutable_id=True)
+        cls._set_inspect_result(inspect_result)
+        return self
 
     def __enter__(self):
         return self
