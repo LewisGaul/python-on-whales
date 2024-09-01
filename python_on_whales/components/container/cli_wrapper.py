@@ -16,7 +16,6 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    TypedDict,
     Union,
     overload,
 )
@@ -46,7 +45,6 @@ from python_on_whales.utils import (
     ValidPath,
     ValidPortMapping,
     custom_parse_object_as,
-    format_mapping_for_cli,
     format_port_arg,
     format_signal_arg,
     format_time_arg,
@@ -58,29 +56,31 @@ from python_on_whales.utils import (
     to_seconds,
 )
 
-DockerContainerListFilters = TypedDict(
-    "DockerContainerListFilters",
-    {
-        "id": str,
-        "name": str,
-        "label": str,
-        "exited": int,
-        "status": Literal[
+ContainerListFilter = Union[
+    Tuple[Literal["id"], str],
+    Tuple[Literal["name"], str],
+    Tuple[Literal["label"], str],
+    Tuple[Literal["label!"], str],
+    Tuple[Literal["exited"], int],
+    Tuple[
+        Literal["status"],
+        Literal[
             "created", "restarting", "running", "removing", "paused", "exited", "dead"
         ],
-        "ancestor": str,
-        "before": str,  # TODO: allow datetime
-        "since": str,  # TODO: allow datetime
-        "volume": str,  # TODO: allow Volumes
-        "network": str,  # TODO: allow Network
-        "publish": str,
-        "expose": str,
-        "health": Literal["starting", "healthy", "unhealthy", "none"],
-        "isolation": Literal["default", "process", "hyperv"],
-        "is-task": str,  # TODO: allow bool
-    },
-    total=False,
-)
+    ],
+    Tuple[Literal["ancestor"], str],
+    Tuple[Literal["before"], str],
+    Tuple[Literal["since"], str],
+    Tuple[Literal["volume"], str],  # TODO: allow Volumes
+    Tuple[Literal["network"], str],  # TODO: allow Network
+    Tuple[Literal["pod"], str],  # TODO: allow Pod
+    Tuple[Literal["publish"], str],
+    Tuple[Literal["expose"], str],
+    Tuple[Literal["health"], Literal["starting", "healthy", "unhealthy", "none"]],
+    Tuple[Literal["isolation"], Literal["default", "process", "hyperv"]],
+    Tuple[Literal["is-task"], str],  # TODO: allow bool
+    Tuple[Literal["until"], str],  # TODO: allow datetime
+]
 
 
 class Container(ReloadableObjectFromJson):
@@ -1171,7 +1171,7 @@ class ContainerCLI(DockerCLICaller):
             return "".join(x[1].decode() for x in iterator)
 
     def list(
-        self, all: bool = False, filters: DockerContainerListFilters = {}
+        self, all: bool = False, filters: List[ContainerListFilter] = []
     ) -> List[Container]:
         """List the containers on the host.
 
@@ -1185,10 +1185,8 @@ class ContainerCLI(DockerCLICaller):
         """
         full_cmd = self.docker_cmd
         full_cmd += ["container", "list", "-q", "--no-trunc"]
-        full_cmd.add_args_iterable_or_single(
-            "--filter", format_mapping_for_cli(filters)
-        )
         full_cmd.add_flag("--all", all)
+        full_cmd.add_args_iterable("--filter", (f"{f[0]}={f[1]}" for f in filters))
 
         # TODO: add a test for the fix of is_immutable_id, without it, we get
         # race conditions (we read the attributes of a container but it might not exist.
@@ -1222,26 +1220,26 @@ class ContainerCLI(DockerCLICaller):
     @overload
     def prune(
         self,
-        filters: Dict[str, str] = {},
+        filters: List[ContainerListFilter] = [],
         stream_logs: Literal[True] = ...,
     ) -> Iterable[Tuple[str, bytes]]: ...
 
     @overload
     def prune(
         self,
-        filters: Dict[str, str] = {},
+        filters: List[ContainerListFilter] = [],
         stream_logs: Literal[False] = ...,
     ) -> None: ...
 
     def prune(
         self,
-        filters: Dict[str, str] = {},
+        filters: List[ContainerListFilter] = {},
         stream_logs: bool = False,
     ):
         """Remove containers that are not running.
 
         Parameters:
-            filters: Filters as strings or list of strings
+            filters: Filters to apply when pruning.
             stream_logs: If `True` this function will return an iterator of strings.
                 You can then read the logs as they arrive. If `False` (the default value), then
                 the function returns `None`, but when it returns, then the prune operation has already been
@@ -1254,9 +1252,7 @@ class ContainerCLI(DockerCLICaller):
                 "docker.container.prune(filters={...})"
             )
         full_cmd = self.docker_cmd + ["container", "prune", "--force"]
-        full_cmd.add_args_iterable_or_single(
-            "--filter", format_mapping_for_cli(filters)
-        )
+        full_cmd.add_args_iterable("--filter", (f"{f[0]}={f[1]}" for f in filters))
         if stream_logs:
             return stream_stdout_and_stderr(full_cmd)
         run(full_cmd)
