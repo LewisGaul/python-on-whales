@@ -197,18 +197,18 @@ def test_mock_create_with_systemd_mode(
     docker.container.create(
         "ubuntu", ["sleep", "infinity"], systemd=systemd_mode, pull="never"
     )
+    # fmt: off
     run_mock.assert_called_once_with(
         docker.client_config.docker_cmd
         + [
-            # fmt: off
             "create",
             "--pull", "never",
             "--systemd", systemd_mode,
             "ubuntu",
             "sleep", "infinity",
-            # fmt: on
         ]
     )
+    # fmt: on
 
 
 def test_create_with_systemd_mode(podman_client: DockerClient):
