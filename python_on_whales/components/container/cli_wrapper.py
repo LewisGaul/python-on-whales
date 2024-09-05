@@ -1014,7 +1014,7 @@ class ContainerCLI(DockerCLICaller):
         else:
             run(full_cmd)
 
-    def init(self, containers: Union[ValidContainer, List[ValidContainer]]) -> None:
+    def init(self, containers: Union[ValidContainer, Iterable[ValidContainer]]) -> None:
         """Initialize one or more containers.
 
         Note that this is only supported by podman.
