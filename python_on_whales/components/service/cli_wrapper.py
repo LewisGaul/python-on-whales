@@ -1,8 +1,22 @@
 from __future__ import annotations
 
 import json
+import warnings
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypeAlias, Union, overload
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+    overload,
+)
+
+from typing_extensions import TypeAlias
 
 import python_on_whales.components.task.cli_wrapper
 from python_on_whales.client_config import (
@@ -359,7 +373,9 @@ class ServiceCLI(DockerCLICaller):
         else:
             return "".join(x[1].decode() for x in iterator)
 
-    def list(self, filters: List[ServiceListFilter] = []) -> List[Service]:
+    def list(
+        self, filters: Union[Iterable[ServiceListFilter], Mapping[str, Any]] = ()
+    ) -> List[Service]:
         """Returns the list of services
 
         Parameters:
@@ -369,6 +385,14 @@ class ServiceCLI(DockerCLICaller):
         # Returns
             A `List[python_on_whales.Services]`
         """
+        if isinstance(filters, Mapping):
+            filters = filters.items()
+            warnings.warn(
+                "Passing filters as a mapping is deprecated, replace with an "
+                "iterable of tuples instead, as so:\n"
+                f"filters={list(filters)}",
+                DeprecationWarning,
+            )
         full_cmd = self.docker_cmd + ["service", "list", "--quiet"]
         full_cmd.add_args_iterable("--filter", (f"{f[0]}={f[1]}" for f in filters))
 

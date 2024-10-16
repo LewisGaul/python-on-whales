@@ -4,6 +4,7 @@ import inspect
 import json
 import shlex
 import textwrap
+import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import (
@@ -21,6 +22,7 @@ from typing import (
 )
 
 import pydantic
+from typing_extensions import TypeAlias
 
 import python_on_whales.components.image.cli_wrapper
 import python_on_whales.components.network.cli_wrapper
@@ -56,7 +58,7 @@ from python_on_whales.utils import (
     to_seconds,
 )
 
-ContainerListFilter = Union[
+ContainerListFilter: TypeAlias = Union[
     Tuple[Literal["id"], str],
     Tuple[Literal["name"], str],
     Tuple[Literal["label"], str],
@@ -1179,7 +1181,9 @@ class ContainerCLI(DockerCLICaller):
             return "".join(x[1].decode() for x in iterator)
 
     def list(
-        self, all: bool = False, filters: List[ContainerListFilter] = []
+        self,
+        all: bool = False,
+        filters: Union[Iterable[ContainerListFilter], Mapping[str, Any]] = (),
     ) -> List[Container]:
         """List the containers on the host.
 
@@ -1187,10 +1191,19 @@ class ContainerCLI(DockerCLICaller):
 
         Parameters:
             all: If `True`, also returns containers that are not running.
+            filters: Filters to apply when listing containers.
 
         # Returns
             A `List[python_on_whales.Container]`
         """
+        if isinstance(filters, Mapping):
+            filters = filters.items()
+            warnings.warn(
+                "Passing filters as a mapping is deprecated, replace with an "
+                "iterable of tuples instead, as so:\n"
+                f"filters={list(filters)}",
+                DeprecationWarning,
+            )
         full_cmd = self.docker_cmd
         full_cmd += ["container", "list", "-q", "--no-trunc"]
         full_cmd.add_flag("--all", all)
@@ -1228,20 +1241,20 @@ class ContainerCLI(DockerCLICaller):
     @overload
     def prune(
         self,
-        filters: List[ContainerListFilter] = [],
+        filters: Union[Iterable[ContainerListFilter], Mapping[str, Any]] = (),
         stream_logs: Literal[True] = ...,
     ) -> Iterable[Tuple[str, bytes]]: ...
 
     @overload
     def prune(
         self,
-        filters: List[ContainerListFilter] = [],
+        filters: Union[Iterable[ContainerListFilter], Mapping[str, Any]] = (),
         stream_logs: Literal[False] = ...,
     ) -> None: ...
 
     def prune(
         self,
-        filters: List[ContainerListFilter] = {},
+        filters: Union[Iterable[ContainerListFilter], Mapping[str, Any]] = (),
         stream_logs: bool = False,
     ):
         """Remove containers that are not running.
@@ -1253,11 +1266,13 @@ class ContainerCLI(DockerCLICaller):
                 the function returns `None`, but when it returns, then the prune operation has already been
                 done.
         """
-        if isinstance(filter, list):
-            raise TypeError(
-                "since python-on-whales 0.38.0, the filter argument is expected to be "
-                "a dict, not a list, please replace your function call by "
-                "docker.container.prune(filters={...})"
+        if isinstance(filters, Mapping):
+            filters = filters.items()
+            warnings.warn(
+                "Passing filters as a mapping is deprecated, replace with an "
+                "iterable of tuples instead, as so:\n"
+                f"filters={list(filters)}",
+                DeprecationWarning,
             )
         full_cmd = self.docker_cmd + ["container", "prune", "--force"]
         full_cmd.add_args_iterable("--filter", (f"{f[0]}={f[1]}" for f in filters))
