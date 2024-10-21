@@ -12,7 +12,7 @@ def test_imagetools_inspect_multiarch():
 
 def test_imagetools_inspect_single_image():
     a = docker.buildx.imagetools.inspect(
-        "python@sha256:b48b88687b1376f3135a048c8cdaccad4e8dd1af2f345c693a39b75a5683a3eb"
+        "python@sha256:10608fb357a18383f792efbf7472ec6d2e166dad62efc0d7c409ef2777aaafd0"
     )
     assert a.schema_version == 2
     assert a.config.media_type.startswith("application/")
