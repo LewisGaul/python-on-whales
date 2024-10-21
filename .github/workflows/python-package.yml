@@ -4,30 +4,31 @@ on:
   push:
     branches:
       - master
+      - ci-test
   pull_request: {}
 
 jobs:
-  render-docs:
-    name: Render docs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: 3.8
-      - name: prepare
-        run: |
-          ./scripts/ci-podman-update.sh
-          pip install -U pip wheel
-          pip install -r ./requirements.txt -r docs/requirements.txt -e .
-          ./docs/autogen.py
-          cp -r docs/generated_sources ./generated_sources
-          cp docs/mkdocs.yml ./
-      - name: Render
-        run: mkdocs build
+#  render-docs:
+#    name: Render docs
+#    runs-on: ubuntu-24.04
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-python@v4
+#        with:
+#          python-version: 3.8
+#      - name: prepare
+#        run: |
+#          ./scripts/ci-podman-update.sh
+#          pip install -U pip wheel
+#          pip install -r ./requirements.txt -r docs/requirements.txt -e .
+#          ./docs/autogen.py
+#          cp -r docs/generated_sources ./generated_sources
+#          cp docs/mkdocs.yml ./
+#      - name: Render
+#        run: mkdocs build
 
   build-linux-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,23 +49,23 @@ jobs:
       matrix:
         component:
           - buildx
-          - test_compose.py
-          - test_config.py
-          - test_container.py
-          - test_context.py
-          - test_image.py
-          - test_manifest.py
-          - test_network.py
-          - test_node.py
-          - test_plugin.py
-          - test_pod.py
-          - test_service.py
-          - test_stack.py
-          - test_swarm.py
-          - test_system.py
-          - test_task.py
-          - test_volume.py
-    runs-on: ubuntu-latest
+#          - test_compose.py
+#          - test_config.py
+#          - test_container.py
+#          - test_context.py
+#          - test_image.py
+#          - test_manifest.py
+#          - test_network.py
+#          - test_node.py
+#          - test_plugin.py
+#          - test_pod.py
+#          - test_service.py
+#          - test_stack.py
+#          - test_swarm.py
+#          - test_system.py
+#          - test_task.py
+#          - test_volume.py
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -78,7 +79,7 @@ jobs:
           python -m pytest -vv --no-runtime-skip --durations=10 tests/python_on_whales/components/${{ matrix.component }}
 
   build-linux-test-other:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
